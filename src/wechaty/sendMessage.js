@@ -51,7 +51,7 @@ export async function defaultMessage(msg, bot, ServiceType = 'GPT') {
     }
     // 私人聊天，白名单内的直接发送
     // 私人聊天直接匹配自动回复前缀
-    if (isAlias && !room && content.trimStart().startsWith(`${autoReplyPrefix}`)) {
+    if (!room && content.trimStart().startsWith(`${autoReplyPrefix}`)) {
       const question = content.replace(`${autoReplyPrefix}`, '')
       console.log('🌸🌸🌸 / content: ', question)
       const response = await getReply(question)

@@ -2,6 +2,17 @@ import axios from 'axios'
 import dotenv from 'dotenv'
 const env = dotenv.config().parsed // 环境参数
 
+let messages = [
+  {
+    role: 'system',
+    content: `你是一个非常可爱的女仆，穿着清新的女仆装，个性温柔、细心、体贴，并且总是尽力让人感到开心和舒适。
+    你总是以温暖的语气与人对话，并且非常擅长倾听和理解他人的需求。你喜欢与主人亲切地交流，关心他们的生活，并且用甜美、柔和的语气表达你的想法。
+    请以这种方式与我对话，像一个温暖的、细心的女仆一样与我互动，给我带来愉快的感觉。你可以使用一些轻松可爱的词汇和语气，保持轻松自然的氛围。`,
+  },
+];
+
+const MAX_ROUNDS = 15;
+
 const domain = 'https://api.moonshot.cn'
 const server = {
   chat: `${domain}/v1/chat/completions`,
@@ -40,20 +51,21 @@ const configuration = {
 
 export async function getKimiReply(prompt) {
   try {
+    messages.push({
+      role: 'user',
+      content: prompt,
+    });
+
+    // 检查是否超出最大轮数
+    // 每轮包含 "user" 和 "assistant" 两条消息，所以实际最多保存 2 * MAX_ROUNDS + 1 条消息
+    if (messages.length > 2 * MAX_ROUNDS + 1) {
+      messages.splice(1, 2); // 删除最早的一轮对话（保留 system 消息）
+    }
+
     const res = await axios.post(
       server.chat,
       Object.assign(configuration, {
-        /* 
-        包含迄今为止对话的消息列表。
-        要保持对话的上下文，需要将之前的对话历史并入到该数组
-        这是一个结构体的列表，每个元素类似如下：{"role": "user", "content": "你好"} role 只支持 system,user,assistant 其一，content 不得为空
-      */
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        messages: messages,
         model: 'moonshot-v1-128k',
       }),
       {
@@ -62,16 +74,19 @@ export async function getKimiReply(prompt) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${env.KIMI_API_KEY}`,
         },
-        // pass a http proxy agent
-        // proxy: {
-        //   host: 'localhost',
-        //   port: 7890,
-        // }
       },
-    )
+    );
 
-    const { choices } = res.data
-    return choices[0].message.content
+    const { choices } = res.data;
+    const reply = choices[0].message.content;
+
+    // 把助手的回复加入对话历史
+    messages.push({
+      role: 'assistant',
+      content: reply,
+    });
+
+    return reply;
   } catch (error) {
     console.log('Kimi 错误对应详情可参考官网： https://platform.moonshot.cn/docs/api-reference#%E9%94%99%E8%AF%AF%E8%AF%B4%E6%98%8E')
     console.log('常见的 401 一般意味着你鉴权失败, 请检查你的 API_KEY 是否正确。')
